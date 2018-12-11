@@ -5,7 +5,57 @@ from PIL import Image
 import os
 import re
 
-FLAGS = {'0,0':0x1, '0,1':0x2, '0,2':0x4, '1,0':0x8, '1,1':0x10, '1,2':0x20, '0,3': 0x40, '1,3': 0x80}
+class AsciiDotter:
+    def __init__(self, image):
+        self.FLAGS = {'0,0':0x1, '0,1':0x2, '0,2':0x4, '1,0':0x8, '1,1':0x10, '1,2':0x20, '0,3': 0x40, '1,3': 0x80}
+        self.image = image.convert(mode='LA')
+        self.dotter_resize()
+        self.threshold = 0.5
+        self.alphathreshold = 1
+
+    def dotter_resize(self):
+        size = self.image.size
+        w,h = size[0], size[1]
+        w += (w%2)
+        h += (h%4)
+        self.image = self.image.resize((w,h), Image.NEAREST)
+
+    def get_braille_pattern(self,flag):
+        return chr(ord('\u2800') + flag)
+
+    def flag_from_sub(self,sub):
+        flag = 0x0
+        size = sub.size
+        for y in range(size[1]):
+            for x in range(size[0]):
+                px = sub.getpixel((x,y))
+                l,a = px
+                l/=255
+                a/=255
+                if a >= self.alphathreshold:
+                    if l <= self.threshold:
+                        flag = flag | self.FLAGS[f'{x},{y}']
+        return flag
+    
+    def set_image(self, image):
+        self.image = image
+
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+
+    def set_alphathreshold(self, at):
+        self.alphathreshold = at
+
+    def process_image(self):
+        size = self.image.size
+        s = ""
+        for y in range(0,size[1],4):
+            for x in range(0,size[0],2):
+                box = (x,y,x+2,y+4)
+                flag = self.flag_from_sub(self.image.crop(box))
+                s+=self.get_braille_pattern(flag)
+            s+=os.linesep
+        return s
 
 def get_file_path():
     path = input("Image to translate: ")
@@ -79,30 +129,6 @@ def write_to_file(text,fallback_filename="ascii-art"):
         print("Could not write to file. Try again.")
         write_to_file(text,fallback_filename)
 
-def dotter_resize(image):
-    size = image.size
-    w,h = size[0], size[1]
-    w += (w%2)
-    h += (h%4)
-    return image.resize((w,h), Image.NEAREST)
-
-def get_braille_pattern(flag):
-    return chr(ord('\u2800') + flag)
-
-def flag_from_sub(sub,threshold=0.5):
-    flag = 0x0
-    size = sub.size
-    for y in range(size[1]):
-        for x in range(size[0]):
-            px = sub.getpixel((x,y))
-            l,a = px
-            l/=255
-            a/=255
-            if a > 0.1:
-                if l <= threshold:
-                    flag = flag | FLAGS[f'{x},{y}']
-    return flag
-
 def get_threshold():
     inp = input("Threshold: ")
     try:
@@ -123,19 +149,9 @@ def main():
     img, fb = get_image()
     fb = os.path.basename(fb)
     fb = fb[:fb.rfind(".")]
-    img = img.convert(mode="LA")
-    img = dotter_resize(img)
-    size = img.size
     threshold = get_threshold()
-    s = ""
-    for y in range(0,size[1],3):
-        for x in range(0,size[0],2):
-            box = (x,y,x+2,y+4)
-            sub = img.crop(box)
-            flag = flag_from_sub(sub,threshold)
-            s+=get_braille_pattern(flag)
-        if y < size[1]-1:
-            s += os.linesep
+    dotter = AsciiDotter(img)
+    s = dotter.process_image()
     write_to_file(s,fb)
 
 if __name__ == "__main__":
