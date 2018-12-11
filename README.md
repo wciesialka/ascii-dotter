@@ -7,10 +7,11 @@ Turn an image into ascii art using Braille Pattern Unicode characters
 
 - Python3.7
 - Pillow
+- Tkinter (for GUI version)
 
 ### Running
 
-`python3 ascii-dotter.py` and follow instructions
+`python3 ascii_dotter.py` or `python3 ascii-dotter-gui.py` and follow instructions
 
 ## Authors
 
